@@ -10,7 +10,7 @@ interface TestInput {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -19,7 +19,8 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const diagnosticId = params.id;
+    const { id } = await params;
+    const diagnosticId = id;
     const body = await request.json();
     const { tests, summary } = body as {
       tests: TestInput[];
@@ -99,7 +100,7 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -108,7 +109,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const diagnosticId = params.id;
+    const { id } = await params;
+    const diagnosticId = id;
     const supabase = createSupabaseServerClient();
 
     // Verify diagnostic belongs to user

@@ -63,7 +63,9 @@ export function mapIncomingCvdPayload(payload: Record<string, unknown>): {
     }
   } else {
     // New format - pass through with validation
-    if (payload.sex) mapped.sex = payload.sex;
+    if (payload.sex && (payload.sex === "male" || payload.sex === "female")) {
+      mapped.sex = payload.sex as "male" | "female";
+    }
     if (payload.age !== undefined) mapped.age = Number(payload.age);
     if (payload.totalChol !== undefined)
       mapped.totalChol = Number(payload.totalChol);
@@ -140,7 +142,8 @@ export function mapIncomingDiabetesPayload(payload: Record<string, unknown>): {
 
     // Use reasonable clinical defaults for missing fields
     // These allow the model to run, but are conservative estimates
-    mapped.onBpTherapy = payload.blood_pressure > 140 ? true : false; // Assume therapy if BP high
+    const bloodPressure = typeof payload.blood_pressure === 'number' ? payload.blood_pressure : 0;
+    mapped.onBpTherapy = bloodPressure > 140 ? true : false; // Assume therapy if BP high
     mapped.parentalHistory = false; // Conservative default
 
     // For HDL and triglycerides, use population averages if not provided
@@ -166,7 +169,9 @@ export function mapIncomingDiabetesPayload(payload: Record<string, unknown>): {
     }
   } else {
     // New format - pass through with validation
-    if (payload.sex) mapped.sex = payload.sex;
+    if (payload.sex && (payload.sex === "male" || payload.sex === "female")) {
+      mapped.sex = payload.sex as "male" | "female";
+    }
     if (payload.age !== undefined) mapped.age = Number(payload.age);
     if (payload.bmi !== undefined) mapped.bmi = Number(payload.bmi);
     if (payload.sbp !== undefined) mapped.sbp = Number(payload.sbp);

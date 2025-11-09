@@ -10,12 +10,13 @@ import {
   AlertTriangle,
   Clock,
   TrendingUp,
-  Calendar,
   CheckCircle,
   Activity,
   Stethoscope,
   FlaskConical,
+  Calendar,
 } from "lucide-react";
+import AvailabilityManager from "@/components/availability/AvailabilityManager";
 import {
   AreaChart,
   Area,
@@ -100,8 +101,16 @@ export default function DoctorDashboardClient({
     useState<ConfirmedAppointment | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"appointments" | "availability">("appointments");
 
-  const highRiskCount = appointments.filter((a) => a.appointment_type === "consultation" && a.status !== "confirmed").length;
+  console.log("🔍 Doctor Dashboard - Active Tab:", activeTab);
+
+  // High-risk patients: consultation type, not confirmed and not cancelled
+  const highRiskCount = appointments.filter(
+    (a) => a.appointment_type === "consultation" && 
+           a.status !== "confirmed" && 
+           a.status !== "cancelled"
+  ).length;
 
   // Helper function to determine test type from diagnostic
   const getTestType = (diagnostic: ConfirmedAppointment['diagnostic']): string => {
@@ -204,7 +213,11 @@ export default function DoctorDashboardClient({
 
   const filteredAppointments = appointments.filter((apt) => {
     if (filterStatus === "all") return true;
-    if (filterStatus === "high-risk") return apt.appointment_type === "consultation" && apt.status !== "confirmed";
+    if (filterStatus === "high-risk") {
+      return apt.appointment_type === "consultation" && 
+             apt.status !== "confirmed" && 
+             apt.status !== "cancelled";
+    }
     return apt.status === filterStatus;
   });
 
@@ -239,33 +252,71 @@ export default function DoctorDashboardClient({
               Manage appointments and monitor patient health
             </p>
           </div>
+          
+          {/* Tabs */}
+          <div className="flex gap-2 mt-4 border-b border-slate-200 dark:border-slate-800">
+            <button
+              onClick={() => setActiveTab("appointments")}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === "appointments"
+                  ? "border-brand-600 text-brand-600"
+                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Activity className="w-4 h-4 inline mr-2" />
+              Appointments
+            </button>
+            <button
+              onClick={() => {
+                console.log("🔵 Availability tab clicked!");
+                setActiveTab("availability");
+              }}
+              className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+                activeTab === "availability"
+                  ? "border-brand-600 text-brand-600"
+                  : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Calendar className="w-4 h-4 inline mr-2" />
+              Availability
+            </button>
+          </div>
         </motion.div>
 
-        {/* KPI Cards */}
-        <motion.div
-          variants={itemVariants}
-          className="grid gap-4 md:grid-cols-4"
-        >
-          {/* Total Appointments */}
-          <Card className="glass p-6 border-border/50 hover:shadow-soft transition-shadow">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Total Appointments
-                </p>
-                <h3 className="text-3xl font-display font-bold mt-2">
-                  {stats.total}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <TrendingUp className="h-3 w-3 text-green-500" />
-                  +12% from last week
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-blue-500/10">
-                <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-            </div>
-          </Card>
+        {/* Conditional Content Based on Active Tab */}
+        {activeTab === "availability" ? (
+          /* Availability Tab */
+          <div key="availability-tab" className="mt-6">
+            <AvailabilityManager />
+          </div>
+        ) : (
+          /* Appointments Tab (existing content) */
+          <div key="appointments-tab">
+            {/* KPI Cards */}
+            <motion.div
+              variants={itemVariants}
+              className="grid gap-4 md:grid-cols-4"
+            >
+              {/* Total Appointments */}
+              <Card className="glass p-6 border-border/50 hover:shadow-soft transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Total Appointments
+                    </p>
+                    <h3 className="text-3xl font-display font-bold mt-2">
+                      {stats.total}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3 text-green-500" />
+                      +12% from last week
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-blue-500/10">
+                    <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+              </Card>
 
           {/* Pending Confirmation */}
           <Card className="glass p-6 border-border/50 hover:shadow-soft transition-shadow">
@@ -861,6 +912,8 @@ export default function DoctorDashboardClient({
               </div>
             </motion.div>
           </div>
+        )}
+        </div>
         )}
       </motion.div>
     </div>

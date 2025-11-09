@@ -20,6 +20,7 @@ interface AppointmentRequest {
   diagnosticId: string;
   preferredDate?: string;
   preferredTime?: string;
+  timeSlot?: string; // Specific time slot (e.g., "09:00", "14:30")
   userInfo?: UserInfo;
   isHighRisk?: boolean; // Flag for high-risk patients
 }
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
         body.preferredDate ||
         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       appointment_time: body.preferredTime || "09:00 AM",
+      time_slot: body.timeSlot || null, // NEW: Store specific time slot (e.g., "09:00")
       status: "scheduled",
       appointment_type: isHighRisk ? "consultation" : "test",
     };

@@ -38,18 +38,11 @@ export default function StepBook({ appointments, diagnosticId, tests = [], onRef
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Auto-navigate to results when appointment is confirmed
-  useEffect(() => {
-    const hasConfirmedAppointment = appointments.some(apt => apt.status === "confirmed");
-    if (hasConfirmedAppointment) {
-      // Automatically redirect to results step
-      router.push(`/diagnostics/${diagnosticId}?step=results`);
-    }
-  }, [appointments, diagnosticId, router]);
-  
-  // Appointment details
+  // Appointment details - MUST be declared BEFORE useEffect
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("09:00");
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   
   // User information
   const [firstName, setFirstName] = useState("");
@@ -63,6 +56,51 @@ export default function StepBook({ appointments, diagnosticId, tests = [], onRef
   const [insuranceProvider, setInsuranceProvider] = useState("");
   const [insuranceId, setInsuranceId] = useState("");
   const [groupNumber, setGroupNumber] = useState("");
+  
+  // Auto-navigate to results when appointment is confirmed
+  useEffect(() => {
+    const hasConfirmedAppointment = appointments.some(apt => apt.status === "confirmed");
+    if (hasConfirmedAppointment) {
+      // Automatically redirect to results step
+      router.push(`/diagnostics/${diagnosticId}?step=results`);
+    }
+  }, [appointments, diagnosticId, router]);
+  
+  // Fetch available slots when date changes
+  useEffect(() => {
+    const fetchAvailableSlots = async () => {
+      if (!appointmentDate) {
+        setAvailableSlots([]);
+        return;
+      }
+      
+      setLoadingSlots(true);
+      try {
+        const response = await fetch(
+          `/api/appointments/available-slots?date=${appointmentDate}&doctorId=default_doctor`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableSlots(data.availableSlots || []);
+          
+          // Auto-select first available slot if current time not available
+          if (data.availableSlots && data.availableSlots.length > 0) {
+            if (!data.availableSlots.includes(appointmentTime)) {
+              setAppointmentTime(data.availableSlots[0]);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching available slots:", error);
+        setAvailableSlots([]);
+      } finally {
+        setLoadingSlots(false);
+      }
+    };
+    
+    fetchAvailableSlots();
+  }, [appointmentDate, appointmentTime]);
 
   const handleBookAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +118,7 @@ export default function StepBook({ appointments, diagnosticId, tests = [], onRef
           diagnosticId,
           preferredDate: appointmentDate,
           preferredTime: appointmentTime,
+          timeSlot: appointmentTime, // Store the specific time slot booked
           userInfo: {
             firstName,
             lastName,
@@ -457,16 +496,51 @@ export default function StepBook({ appointments, diagnosticId, tests = [], onRef
 
                 <div className="space-y-2">
                   <Label htmlFor="time" className="text-slate-900 dark:text-white">
-                    Preferred Time *
+                    Available Time Slots *
                   </Label>
-                  <Input
-                    id="time"
-                    type="time"
-                    value={appointmentTime}
-                    onChange={(e) => setAppointmentTime(e.target.value)}
-                    required
-                    className="bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
-                  />
+                  
+                  {!appointmentDate ? (
+                    <p className="text-sm text-slate-500 dark:text-slate-400 py-3">
+                      Please select a date first to see available time slots
+                    </p>
+                  ) : loadingSlots ? (
+                    <div className="flex items-center gap-2 py-3 text-slate-600 dark:text-slate-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading available slots...
+                    </div>
+                  ) : availableSlots.length === 0 ? (
+                    <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                      <p className="text-sm text-amber-800 dark:text-amber-300">
+                        No available slots for this date. Please choose another date or the doctor hasn&apos;t set availability yet.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-2">
+                      {availableSlots.map((slot) => {
+                        const [hours, minutes] = slot.split(":");
+                        const hour = parseInt(hours);
+                        const ampm = hour >= 12 ? "PM" : "AM";
+                        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+                        const displayTime = `${displayHour}:${minutes} ${ampm}`;
+                        
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            onClick={() => setAppointmentTime(slot)}
+                            className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                              appointmentTime === slot
+                                ? "border-brand-500 bg-brand-50 dark:bg-brand-950 text-brand-700 dark:text-brand-300"
+                                : "border-slate-200 dark:border-slate-700 hover:border-brand-300 text-slate-700 dark:text-slate-300"
+                            }`}
+                          >
+                            <Clock className="w-4 h-4 mx-auto mb-1" />
+                            {displayTime}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 

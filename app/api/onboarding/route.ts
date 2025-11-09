@@ -52,27 +52,69 @@ export async function POST(request: NextRequest) {
     // Create Supabase server client
     const supabase = createSupabaseServerClient();
 
-    // Update the user record with onboarding information
-    const { data, error } = await supabase
+    // First, check if user exists
+    const { data: existingUser } = await supabase
       .from("users")
-      .update({
-        phone_number,
-        street_address,
-        city,
-        state,
-        zip_code,
-        insurance_provider: insurance_provider || null,
-        insurance_id: insurance_id || null,
-        group_number: group_number || null,
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
-      })
+      .select("clerk_user_id")
       .eq("clerk_user_id", clerkUserId)
-      .select()
       .single();
 
+    let data, error;
+
+    if (!existingUser) {
+      console.log("👤 User doesn't exist, creating new user record");
+      // User doesn't exist, create them (upsert)
+      const upsertResult = await supabase
+        .from("users")
+        .upsert(
+          {
+            clerk_user_id: clerkUserId,
+            phone_number,
+            street_address,
+            city,
+            state,
+            zip_code,
+            insurance_provider: insurance_provider || null,
+            insurance_id: insurance_id || null,
+            group_number: group_number || null,
+            onboarding_completed: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "clerk_user_id" }
+        )
+        .select()
+        .single();
+
+      data = upsertResult.data;
+      error = upsertResult.error;
+    } else {
+      console.log("📝 User exists, updating onboarding info");
+      // User exists, update their onboarding information
+      const updateResult = await supabase
+        .from("users")
+        .update({
+          phone_number,
+          street_address,
+          city,
+          state,
+          zip_code,
+          insurance_provider: insurance_provider || null,
+          insurance_id: insurance_id || null,
+          group_number: group_number || null,
+          onboarding_completed: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("clerk_user_id", clerkUserId)
+        .select()
+        .single();
+
+      data = updateResult.data;
+      error = updateResult.error;
+    }
+
     if (error) {
-      console.error("Supabase update error:", error);
+      console.error("Supabase operation error:", error);
       return NextResponse.json(
         {
           error: "Failed to save onboarding information",

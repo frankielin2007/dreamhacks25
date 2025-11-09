@@ -1,4 +1,4 @@
-# CuraNova Appointments System
+# FluxCare Appointments System
 
 This document describes the simplified appointments system implementation.
 

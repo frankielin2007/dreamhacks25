@@ -1,11 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/utils/supabase/server";
 
+interface UserInfo {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  streetAddress: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  insuranceProvider?: string;
+  insuranceId?: string;
+  groupNumber?: string;
+}
+
 interface AppointmentRequest {
   userId: string;
   diagnosticId: string;
   preferredDate?: string;
   preferredTime?: string;
+  userInfo?: UserInfo;
+  isHighRisk?: boolean; // Flag for high-risk patients
 }
 
 export async function POST(request: NextRequest) {
@@ -15,7 +31,7 @@ export async function POST(request: NextRequest) {
     console.log("📝 Received appointment request:", body);
 
     // Validate required fields
-    const { userId, diagnosticId } = body;
+    const { userId, diagnosticId, userInfo, isHighRisk } = body;
 
     if (!userId || !diagnosticId) {
       return NextResponse.json(
@@ -26,6 +42,34 @@ export async function POST(request: NextRequest) {
 
     const supabase = createSupabaseServerClient();
 
+    // Update or create user record if userInfo is provided
+    if (userInfo) {
+      const { error: userError } = await supabase
+        .from("users")
+        .upsert({
+          clerk_user_id: userId,
+          email: userInfo.email,
+          first_name: userInfo.firstName,
+          last_name: userInfo.lastName,
+          phone_number: userInfo.phoneNumber,
+          street_address: userInfo.streetAddress,
+          city: userInfo.city,
+          state: userInfo.state,
+          zip_code: userInfo.zipCode,
+          insurance_provider: userInfo.insuranceProvider || null,
+          insurance_id: userInfo.insuranceId || null,
+          group_number: userInfo.groupNumber || null,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: "clerk_user_id"
+        });
+
+      if (userError) {
+        console.error("Error upserting user info:", userError);
+        // Continue anyway - don't fail appointment booking if user update fails
+      }
+    }
+
     // Create appointment record
     const appointmentData = {
       user_id: userId,
@@ -35,7 +79,11 @@ export async function POST(request: NextRequest) {
         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       appointment_time: body.preferredTime || "09:00 AM",
       status: "scheduled",
+      appointment_type: isHighRisk ? "consultation" : "test",
     };
+
+    console.log("📝 Appointment data to insert:", appointmentData);
+    console.log("🔍 isHighRisk flag:", isHighRisk, "→ appointment_type:", appointmentData.appointment_type);
 
     const { data: appointment, error: appointmentError } = await supabase
       .from("appointments")
@@ -69,10 +117,12 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("✅ Appointment created:", appointment);
+    console.log("⏳ Appointment pending doctor confirmation - no email sent yet");
 
     return NextResponse.json({
-      message: "Appointment request submitted successfully",
+      message: "Appointment request submitted successfully - pending doctor confirmation",
       appointment,
+      note: "Confirmation email will be sent after doctor approval",
     });
   } catch (error) {
     console.error("Error creating appointment:", error);

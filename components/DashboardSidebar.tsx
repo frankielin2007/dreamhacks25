@@ -62,9 +62,9 @@ function DashboardSidebar({ displayName }: { displayName?: string }) {
         {/* Header */}
         <div className="px-4 py-4 flex items-center gap-3 border-gray-100">
           <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-purple-400 to-indigo-400 flex items-center justify-center text-white font-bold">
-            CN
+            FC
           </div>
-          <div className="text-sm font-semibold">CuraNova</div>
+          <div className="text-sm font-semibold">FluxCare</div>
         </div>
         <hr className="mx-4" />
         {/* Menu Options */}

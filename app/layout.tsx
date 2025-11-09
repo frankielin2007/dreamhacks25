@@ -1,6 +1,6 @@
 // Next
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Sora } from "next/font/google";
 import "./globals.css";
 
 // Clerk
@@ -8,21 +8,32 @@ import { ClerkProvider } from "@clerk/nextjs";
 
 // Components
 import OnboardingGuard from "@/components/OnboardingGuard";
+import { ThemeProvider } from "@/context/ThemeProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// FluxCare brand fonts
+const inter = Inter({
+  variable: "--font-body",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const sora = Sora({
+  variable: "--font-display",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "CuraNova - AI-Powered Healthcare",
+  title: "FluxCare — Primary care, fewer clicks",
   description:
-    "Transform your healthcare experience with AI-powered diagnostics and personalized care",
+    "AI-powered primary care that adapts to you. Get intelligent diagnostics, personalized risk assessments, and seamless appointment scheduling—all in one place.",
+  openGraph: {
+    title: "FluxCare — Primary care, fewer clicks",
+    description:
+      "AI-powered primary care that adapts to you. Get intelligent diagnostics, personalized risk assessments, and seamless appointment scheduling.",
+    type: "website",
+  },
+  themeColor: "#4F46E5",
 };
 
 export default function RootLayout({
@@ -32,11 +43,16 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
-          <OnboardingGuard>{children}</OnboardingGuard>
+      <html lang="en" className={`${inter.variable} ${sora.variable}`} suppressHydrationWarning>
+        <body className="font-body antialiased">
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <OnboardingGuard>{children}</OnboardingGuard>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

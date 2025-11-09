@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       <html>
         <head>
           <meta charset="utf-8">
-          <title>Appointment Confirmation - CuraNova</title>
+          <title>Appointment Confirmation - FluxCare</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
             .header { background-color: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
@@ -83,25 +83,22 @@ export async function POST(request: NextRequest) {
         </head>
         <body>
           <div class="header">
-            <h1>🏥 CuraNova</h1>
+            <h1>🏥 FluxCare</h1>
             <p>Your Healthcare Companion</p>
           </div>
           
           <div class="content">
             <h2>✅ Appointment Confirmed!</h2>
             <p>Dear Patient,</p>
-            <p>Your appointment has been successfully confirmed. We look forward to providing you with excellent healthcare service.</p>
+            <p>Your appointment has been successfully confirmed at Shands Hospital. We look forward to providing you with excellent healthcare service.</p>
             
             <div class="appointment-details">
               <h3>📅 Appointment Details</h3>
               <p><strong>Date:</strong> ${appointmentDate}</p>
               <p><strong>Time:</strong> ${appointment.appointment_time}</p>
               <p><strong>Status:</strong> <span class="status">Confirmed</span></p>
-              ${
-                appointment.diagnostic?.hospital
-                  ? `<p><strong>Location:</strong> ${appointment.diagnostic.hospital}</p>`
-                  : ""
-              }
+              <p><strong>Location:</strong> Shands Hospital</p>
+              <p><strong>Address:</strong> 1600 SW Archer Rd, Gainesville, FL 32610</p>
               <p><strong>Appointment ID:</strong> ${appointment.id}</p>
             </div>
 
@@ -143,16 +140,16 @@ export async function POST(request: NextRequest) {
               <li>If you need to reschedule, please contact us at least 24 hours in advance</li>
             </ul>
 
-            <h3>📞 Need Help?</h3>
-            <p>If you have any questions or need to make changes to your appointment, please don't hesitate to contact us:</p>
-            <ul>
-              <li><strong>Phone:</strong> (555) 123-CURA</li>
-              <li><strong>Email:</strong> appointments@curanova.com</li>
+            <h3>Need Help?</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li><strong>Phone:</strong> (352) 265-0111</li>
+              <li><strong>Email:</strong> appointments@fluxcare.com</li>
+              <li><strong>Portal:</strong> <a href="${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/appointments">Manage Appointments</a></li>
             </ul>
           </div>
 
           <div class="footer">
-            <p><strong>CuraNova Healthcare</strong></p>
+            <p><strong>FluxCare Healthcare</strong></p>
             <p>Revolutionizing Healthcare with AI-Powered Diagnostics</p>
             <p style="font-size: 12px; margin-top: 15px;">
               This is an automated confirmation email. Please do not reply to this email.
@@ -162,41 +159,39 @@ export async function POST(request: NextRequest) {
       </html>
     `;
 
+    // Plain text version for email clients that don't support HTML
+    const textContent = `
+FluxCare - Appointment Confirmation
+
+Your appointment has been confirmed at Shands Hospital.
+
+Date: ${appointmentDate}
+Time: ${appointment.appointment_time}
+Location: Shands Hospital
+Address: 1600 SW Archer Rd, Gainesville, FL 32610
+
+Appointment ID: ${appointment.id}
+
+Please arrive 15 minutes early for check-in.
+
+Need Help?
+Phone: (352) 265-0111
+Email: appointments@fluxcare.com
+
+---
+FluxCare Healthcare
+Revolutionizing Healthcare with AI-Powered Diagnostics
+    `;
+
     console.log("📧 Sending confirmation email to:", userEmail);
 
     // Send email using Resend
     const { data, error } = await resend.emails.send({
-      from: "CuraNova <noreply@resend.dev>", // Using resend.dev domain for development
+      from: "FluxCare <noreply@resend.dev>", // Using resend.dev domain for development
       to: [userEmail],
       subject: `Appointment Confirmed - ${appointmentDate} at ${appointment.appointment_time}`,
       html: htmlContent,
-      text: `
-        CuraNova - Appointment Confirmation
-        
-        Your appointment has been confirmed!
-        
-        Date: ${appointmentDate}
-        Time: ${appointment.appointment_time}
-        Status: Confirmed
-        Appointment ID: ${appointment.id}
-        ${
-          appointment.diagnostic?.hospital
-            ? `Location: ${appointment.diagnostic.hospital}`
-            : ""
-        }
-        
-        ${
-          appointment.diagnostic?.symptom
-            ? `Symptoms: ${appointment.diagnostic.symptom}`
-            : ""
-        }
-        
-        Please arrive 15 minutes early for check-in.
-        
-        Need help? Contact us at (555) 123-CURA or appointments@curanova.com
-        
-        CuraNova Healthcare - Revolutionizing Healthcare with AI
-      `,
+      text: textContent,
     });
 
     if (error) {

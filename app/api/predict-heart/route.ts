@@ -1,141 +1,182 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { createSupabaseServerClient } from "@/utils/supabase/server";
+import { mapIncomingCvdPayload } from "@/lib/risk/map";
+import { computeFraminghamCvd } from "@/lib/risk/framinghamCvd";
+import { framinghamCvdSchema } from "@/lib/risk/schema";
 
-interface HeartPredictionRequest {
-  testId: string;
-  age: number;
-  sex: string;
-  is_smoking: string;
-  cigsPerDay: number;
-  BPMeds: number;
-  prevalentStroke: number;
-  prevalentHyp: number;
-  diabetes: number;
-  totChol: number;
-  sysBP: number;
-  diaBP: number;
-  BMI: number;
-  heartRate: number;
+// Async function to log predictions to Supabase (non-blocking)
+async function logPrediction(
+  userId: string | null,
+  model: string,
+  input: any,
+  probability: number,
+  label: string
+) {
+  try {
+    const supabase = createSupabaseServerClient();
+    await supabase.from("predictions").insert({
+      user_id: userId,
+      model,
+      input: JSON.stringify(input),
+      probability,
+      label,
+    });
+    console.log("✅ Prediction logged to database");
+  } catch (err) {
+    console.error("⚠️ Failed to log prediction:", err);
+    // Don't fail the request if logging fails
+  }
 }
 
 export async function POST(request: NextRequest) {
   console.log("🫀 Heart disease prediction API called");
   try {
-    const body: HeartPredictionRequest = await request.json();
+    const body = await request.json();
     console.log("📝 Received request body:", body);
 
-    // Validate required fields
-    const {
-      testId,
-      age,
-      sex,
-      is_smoking,
-      cigsPerDay,
-      BPMeds,
-      prevalentStroke,
-      prevalentHyp,
-      diabetes,
-      totChol,
-      sysBP,
-      diaBP,
-      BMI,
-      heartRate,
-    } = body;
+    // Get user ID from Clerk
+    const { userId } = await auth();
+    console.log("👤 User ID:", userId || "anonymous");
 
-    if (
-      testId === undefined ||
-      age === undefined ||
-      sex === undefined ||
-      is_smoking === undefined ||
-      cigsPerDay === undefined ||
-      BPMeds === undefined ||
-      prevalentStroke === undefined ||
-      prevalentHyp === undefined ||
-      diabetes === undefined ||
-      totChol === undefined ||
-      sysBP === undefined ||
-      diaBP === undefined ||
-      BMI === undefined ||
-      heartRate === undefined
-    ) {
+    // Step 1: Map incoming payload (handles both old and new formats)
+    const { mapped, isOldFormat, missingFields } = mapIncomingCvdPayload(body);
+    console.log("🔄 Payload mapping:", {
+      isOldFormat,
+      missingFields,
+      mapped,
+    });
+
+    // Step 2: Check for missing required fields
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { error: "Missing required fields for heart disease prediction" },
+        {
+          error:
+            "Missing required fields for accurate Framingham CVD risk calculation",
+          missingFields,
+          message: `Please provide: ${missingFields.join(", ")}. These fields are required for the Framingham General CVD model.`,
+          hint: isOldFormat
+            ? "It looks like you're using an old format. The most critical missing field is HDL cholesterol, which is required for accurate cardiovascular risk calculation."
+            : "Please fill in all required fields in the form.",
+        },
         { status: 400 }
       );
     }
 
-    // Call your FastAPI ML backend
-    const fastApiUrl = process.env.FAST_API_URL || "http://localhost:8000";
-    console.log("🔗 FastAPI URL:", fastApiUrl);
-
-    // Convert string values to numeric for ML model
-    const sexNumeric = sex === "M" ? 1 : 0;
-    const smokingNumeric = is_smoking === "YES" ? 1 : 0;
-
-    // Create features array in the order your ML model expects
-    const featuresArray = [
-      age,
-      sexNumeric,
-      smokingNumeric,
-      cigsPerDay,
-      BPMeds,
-      prevalentStroke,
-      prevalentHyp,
-      diabetes,
-      totChol,
-      sysBP,
-      diaBP,
-      BMI,
-      heartRate,
-    ];
-
-    const requestPayload = { features: featuresArray };
-    console.log("📊 Sending to ML model:", requestPayload);
-
-    const mlResponse = await fetch(`${fastApiUrl}/predict-heart`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestPayload),
-    });
-
-    if (!mlResponse.ok) {
-      const errorText = await mlResponse.text();
-      console.error(`ML API Error (${mlResponse.status}):`, errorText);
-      throw new Error(
-        `ML API responded with status: ${mlResponse.status} - ${errorText}`
+    // Step 3: Validate with Zod schema
+    let validatedInput;
+    try {
+      validatedInput = framinghamCvdSchema.parse(mapped);
+      console.log("✅ Input validated:", validatedInput);
+    } catch (validationError) {
+      console.error("❌ Validation error:", validationError);
+      return NextResponse.json(
+        {
+          error: "Invalid input data",
+          details:
+            validationError instanceof Error
+              ? validationError.message
+              : "Validation failed",
+        },
+        { status: 400 }
       );
     }
 
-    const mlResult = await mlResponse.json();
-    console.log("🤖 ML Model Response:", mlResult);
+    // Step 4: Try FastAPI first if configured
+    const fastApiUrl = process.env.FAST_API_URL;
+    if (fastApiUrl && fastApiUrl !== "mock") {
+      console.log("🔗 Trying FastAPI at:", fastApiUrl);
+      try {
+        // For old format compatibility with FastAPI
+        const sexNumeric = validatedInput.sex === "male" ? 1 : 0;
+        const smokingNumeric = validatedInput.smoker ? 1 : 0;
 
-    // Return the ML prediction result
-    // Your FastAPI returns {"prediction": value} where value is 0 or 1
+        const featuresArray = [
+          validatedInput.age,
+          sexNumeric,
+          smokingNumeric,
+          body.cigsPerDay || 0,
+          validatedInput.treated ? 1 : 0,
+          body.prevalentStroke || 0,
+          body.prevalentHyp || 0,
+          validatedInput.diabetes ? 1 : 0,
+          validatedInput.totalChol,
+          validatedInput.sbp,
+          body.diaBP || 80,
+          body.BMI || 25,
+          body.heartRate || 75,
+        ];
+
+        const mlResponse = await fetch(`${fastApiUrl}/predict-heart`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ features: featuresArray }),
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        });
+
+        if (mlResponse.ok) {
+          const mlResult = await mlResponse.json();
+          console.log("🤖 FastAPI Response:", mlResult);
+
+          // Log to Supabase asynchronously
+          logPrediction(
+            userId,
+            "fastapi_heart",
+            validatedInput,
+            mlResult.probability || 0.5,
+            "remote"
+          );
+
+          return NextResponse.json({
+            testId: body.testId ?? null,
+            prediction: mlResult.prediction,
+            probability: mlResult.probability,
+            message: "Heart disease prediction from FastAPI backend",
+            inputData: body,
+            rawResponse: mlResult,
+          });
+        }
+      } catch (fastApiError) {
+        console.log(
+          "⚠️ FastAPI unavailable, falling back to local Framingham calculator:",
+          fastApiError instanceof Error ? fastApiError.message : "Unknown error"
+        );
+      }
+    } else {
+      console.log(
+        "📍 FastAPI not configured, using local Framingham CVD calculator"
+      );
+    }
+
+    // Step 5: Compute locally with Framingham General CVD Model
+    console.log("🧮 Computing risk with Framingham CVD Model...");
+    const result = computeFraminghamCvd(validatedInput);
+    console.log("📊 Framingham result:", result);
+
+    const risk = result.probability; // 0..1
+    const riskPct = Math.round(risk * 1000) / 10; // One decimal percentage
+    const prediction = riskPct > 20 ? 1 : 0; // Threshold at 20%
+
+    // Step 6: Log to Supabase (non-blocking)
+    logPrediction(userId, "framingham_cvd_2008", validatedInput, risk, result.label);
+
+    // Step 7: Return in expected format for UI
     return NextResponse.json({
-      testId,
-      prediction: mlResult.prediction,
-      probability: mlResult.probability, // Use prediction as probability (0 or 1)
-      message: "Heart disease prediction completed successfully",
-      inputData: {
-        age,
-        sex,
-        is_smoking,
-        cigsPerDay,
-        BPMeds,
-        prevalentStroke,
-        prevalentHyp,
-        diabetes,
-        totChol,
-        sysBP,
-        diaBP,
-        BMI,
-        heartRate,
+      testId: body.testId ?? null,
+      prediction,
+      probability: risk,
+      message:
+        "Computed locally via Framingham General CVD 10-Year Risk Model (2008)",
+      inputData: body,
+      rawResponse: {
+        model: "framingham_cvd_2008",
+        riskPercentage: riskPct,
+        label: result.label,
+        details: result.details,
       },
-      rawResponse: mlResult,
     });
   } catch (error) {
-    console.error("Error in heart disease prediction:", error);
+    console.error("❌ Error in heart disease prediction:", error);
     return NextResponse.json(
       {
         error: "Failed to process heart disease prediction",

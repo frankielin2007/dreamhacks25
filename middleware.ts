@@ -7,27 +7,48 @@ const isProtectedRoute = createRouteMatcher([
   "/appointments(.*)",
   "/diagnostics(.*)",
   "/doctor(.*)",
+  "/start(.*)",
+  "/analytics(.*)",
+  "/tests(.*)",
+  "/settings(.*)",
 ]);
 
-// Define public routes
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/onboarding",
+// Doctor-only routes
+const isDoctorRoute = createRouteMatcher([
+  "/dashboard(.*)",
+  "/analytics(.*)",
+  "/doctor(.*)",
+]);
+
+// Patient-only routes
+const isPatientRoute = createRouteMatcher([
+  "/start(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  const { userId } = await auth();
-  const { pathname } = req.nextUrl;
+  const { userId, sessionClaims } = await auth();
 
   // If user is not logged in and trying to access protected route
   if (!userId && isProtectedRoute(req)) {
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
-  // For authenticated users, we'll handle onboarding checks on the client side
-  // to avoid unnecessary server round trips in middleware
+  // Role-based routing for authenticated users
+  // DEMO MODE: Disabled role restrictions for doctor dashboard access
+  // if (userId && sessionClaims) {
+  //   // Access publicMetadata from sessionClaims
+  //   const role = (sessionClaims.publicMetadata as { role?: string })?.role || "patient";
+
+  //   // Doctor accessing patient-only routes → redirect to dashboard
+  //   if (role === "doctor" && isPatientRoute(req)) {
+  //     return NextResponse.redirect(new URL("/dashboard", req.url));
+  //   }
+
+  //   // Patient accessing doctor-only routes → redirect to start
+  //   if (role !== "doctor" && isDoctorRoute(req)) {
+  //     return NextResponse.redirect(new URL("/start", req.url));
+  //   }
+  // }
 
   return NextResponse.next();
 });

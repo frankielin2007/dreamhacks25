@@ -9,7 +9,7 @@ import { framinghamCvdSchema } from "@/lib/risk/schema";
 async function logPrediction(
   userId: string | null,
   model: string,
-  input: any,
+  input: Record<string, unknown>,
   probability: number,
   label: string
 ) {

@@ -6,7 +6,7 @@ import type {
 // ============================================
 // Mapper for CVD/Heart Disease Payload
 // ============================================
-export function mapIncomingCvdPayload(payload: any): {
+export function mapIncomingCvdPayload(payload: Record<string, unknown>): {
   mapped: Partial<FraminghamCvdInput>;
   isOldFormat: boolean;
   missingFields: string[];
@@ -103,7 +103,7 @@ export function mapIncomingCvdPayload(payload: any): {
 // ============================================
 // Mapper for Diabetes Payload
 // ============================================
-export function mapIncomingDiabetesPayload(payload: any): {
+export function mapIncomingDiabetesPayload(payload: Record<string, unknown>): {
   mapped: Partial<FraminghamDiabetesInput>;
   isOldFormat: boolean;
   missingFields: string[];

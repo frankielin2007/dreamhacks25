@@ -178,7 +178,7 @@ export default function HighRiskCareScheduling({
             </h2>
             <p className={`text-sm ${colors.text} mb-4`}>
               Your risk assessment indicates a <strong>{(maxRisk * 100).toFixed(1)}%</strong> probability, 
-              which requires clinical attention. We've prepared everything you need for a seamless consultation.
+              which requires clinical attention. We&apos;ve prepared everything you need for a seamless consultation.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {riskResults.diabetes && (
@@ -241,7 +241,7 @@ export default function HighRiskCareScheduling({
                 </div>
                 <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Flagged as high-risk in doctor's dashboard</span>
+                  <span>Flagged as high-risk in doctor&apos;s dashboard</span>
                 </div>
               </div>
             )}
@@ -399,7 +399,7 @@ export default function HighRiskCareScheduling({
               </li>
             </ul>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-4 italic">
-              💡 You'll receive email reminders 24 hours and 2 hours before your appointment
+              💡 You&apos;ll receive email reminders 24 hours and 2 hours before your appointment
             </p>
           </div>
         </div>
